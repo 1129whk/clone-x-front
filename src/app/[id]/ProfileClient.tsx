@@ -7,27 +7,66 @@ import { currentUser } from "@/data/currentUser";
 import Post from "@/components/posts/Post";
 import Spinner from "@/components/ui/Spinner";
 import Center from "@/components/ui/Center";
+import NextImage from "next/image";
 
 type TabKey = "posts" | "likes";
 
-const tabs: { key: TabKey; label: string; enabled: boolean }[] = [
-  { key: "posts", label: "Posts", enabled: true },
-  { key: "likes", label: "Likes", enabled: true },
-];
-
-const MIN_SHOW_MS = 220; // 스피너 최소 노출 시간
+const MIN_SHOW_MS = 220;
 
 export default function ProfileClient({ id }: { id: string }) {
-  if (id !== currentUser.id) {
-    notFound();
-  }
+  const isMe = id === currentUser.id;
 
   const { posts, toggleLike, toggleRetweet } = usePosts();
+
+  // id로 대상 사용자(author) 추출
+  const viewedAuthor = useMemo(() => {
+    if (isMe) {
+      // currentUser를 author 스키마와 맞춰 반환
+      return {
+        id: currentUser.id,
+        name: currentUser.username,
+        username: currentUser.username,
+        profileImage: currentUser.profileImage,
+        verified: true,
+        coverImage: currentUser.coverImage,
+      };
+    }
+    // 포스트들에서 해당 author.id를 가진 첫 글의 author를 사용
+    const found = posts.find((p) => p.author.id === id)?.author;
+    return found
+      ? {
+          ...found,
+          // coverImage가 없다면 안전한 기본값
+          coverImage:
+            (found as any).coverImage ??
+            `https://picsum.photos/1200/400?blur=2&random=${encodeURIComponent(
+              found.id
+            )}`,
+        }
+      : null;
+  }, [id, isMe, posts]);
+
+  useEffect(() => {
+    // 하이드레이션 전엔 posts가 비어있을 수 있으므로, 살짝 기다렸다가 판단
+    // posts가 한 번이라도 채워졌는데 viewedAuthor가 없으면 notFound
+    if (posts.length > 0 && !viewedAuthor) {
+      notFound();
+    }
+  }, [posts.length, viewedAuthor]);
+
+  // 탭 구성: 나면 posts/likes, 남이면 posts만
+  const tabs: { key: TabKey; label: string; enabled: boolean }[] = isMe
+    ? [
+        { key: "posts", label: "Posts", enabled: true },
+        { key: "likes", label: "Likes", enabled: true },
+      ]
+    : [{ key: "posts", label: "Posts", enabled: true }];
+
   const [active, setActive] = useState<TabKey>("posts");
   const [showSpinner, setShowSpinner] = useState(true); // 초기엔 항상 스피너 ON
   const hideTimerRef = useRef<number | null>(null);
 
-  // 공통: 스피너 끄기(최소 노출시간 보장)
+  // 스피너 끄기(최소 노출시간 보장)
   const scheduleHideSpinner = () => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = window.setTimeout(() => {
@@ -59,26 +98,122 @@ export default function ProfileClient({ id }: { id: string }) {
     scheduleHideSpinner();
   };
 
+  // currentUser냐 아니냐에 따라 필터 분기
   const filtered = useMemo(() => {
-    const base =
-      active === "posts"
-        ? posts.filter(
-            (p) => p.author.id === currentUser.id || p.isRetweeted === true
-          )
-        : posts.filter((p) => p.isLiked === true);
+    if (!viewedAuthor) return [];
 
-    return base.sort((a, b) => {
-      const t =
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      return t !== 0 ? t : b.postId - a.postId;
-    });
-  }, [active, posts]);
+    if (active === "posts") {
+      // 내 프로필이면: 내가 쓴 글 + 내가 리포스트한 글
+      // 남의 프로필이면: 해당 사용자가 직접 쓴 글만
+      const base = isMe
+        ? posts.filter((p) => p.author.id === id || p.isRetweeted === true)
+        : posts.filter((p) => p.author.id === id);
 
-  // 비어있음을 보여줄 조건: 스피너가 꺼져 있고, 스토어가 하이드레이션되어 있고, 필터 결과가 진짜로 0개일 때
-  const showEmpty = !showSpinner && posts.length > 0 && filtered.length === 0;
+      return base.sort((a, b) => {
+        const t =
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return t !== 0 ? t : b.postId - a.postId;
+      });
+    }
+
+    // Likes 탭: 현재 구조상 isLiked는 currentUser 기준
+    if (!isMe) return [];
+    return posts
+      .filter((p) => p.isLiked === true)
+      .sort((a, b) => {
+        const t =
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return t !== 0 ? t : b.postId - a.postId;
+      });
+  }, [active, isMe, posts, viewedAuthor, id]);
+
+  const showEmpty =
+    !showSpinner && posts.length > 0 && viewedAuthor && filtered.length === 0;
 
   return (
     <div>
+      {/* 프로필 헤더(커버/아바타/버튼) */}
+      {viewedAuthor && (
+        <div className="mb-2">
+          {/* Cover & Avatar */}
+          <div className="relative w-full">
+            {/* Cover */}
+            <div className="w-full aspect-[3/1] relative overflow-hidden">
+              <NextImage
+                src={viewedAuthor.coverImage}
+                alt={`${viewedAuthor.username} cover`}
+                fill
+                sizes="100vw"
+                priority
+                className="object-cover"
+              />
+            </div>
+            {/* Avatar */}
+            <div className="w-1/5 aspect-square rounded-full overflow-hidden border-4 border-black bg-gray-300 absolute left-4 -translate-y-1/2">
+              <NextImage
+                src={viewedAuthor.profileImage}
+                alt={`${viewedAuthor.username} profile`}
+                width={100}
+                height={100}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex w-full items-center justify-end gap-2 p-2">
+            {isMe ? (
+              <button className="py-2 px-4 mt-2 bg-white text-black font-bold rounded-full">
+                Edit Profile
+              </button>
+            ) : (
+              <button className="py-2 px-4 mt-2 bg-white text-black font-bold rounded-full">
+                Follow
+              </button>
+            )}
+          </div>
+
+          {/* User Details */}
+          <div className="p-4 flex flex-col gap-2">
+            <div>
+              <h1 className="text-2xl font-bold">{viewedAuthor.username}</h1>
+              <span className="text-textGray text-sm">@{viewedAuthor.id}</span>
+            </div>
+            <p>Hello!</p>
+            <div className="flex gap-4 text-textGray text-[15px]">
+              <div className="flex items-center gap-2">
+                <NextImage
+                  src="icons/userLocation.svg"
+                  alt="location"
+                  width={20}
+                  height={20}
+                />
+                <span>Korea</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <NextImage
+                  src="icons/date.svg"
+                  alt="date"
+                  width={20}
+                  height={20}
+                />
+                <span>Joined October 2025</span>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <span className="font-bold">100</span>
+                <span className="text-textGray text-[15px]">Followers</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold">100</span>
+                <span className="text-textGray text-[15px]">Followings</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 탭 바 */}
       <div
         role="tablist"

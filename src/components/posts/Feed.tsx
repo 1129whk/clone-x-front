@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Post from "./Post";
 import {
   fetchPosts,
@@ -52,6 +52,24 @@ const Feed = () => {
     hasMoreRef.current = hasMore;
   }, [hasMore]);
 
+  const loadMore = useCallback(async () => {
+    if (isFetchingRef.current || loading || !hasMoreRef.current) return;
+    isFetchingRef.current = true;
+    setLoading(true);
+
+    const { items, total } = await fetchPosts(page, LIMIT);
+    addPosts(items);
+
+    const endIndex = page * LIMIT;
+    const more = endIndex < total && items.length === LIMIT;
+    setHasMore(more);
+    hasMoreRef.current = more;
+
+    setPage((p) => p + 1);
+    setLoading(false);
+    isFetchingRef.current = false;
+  }, [loading, page, addPosts]);
+
   // 첫 진입: 스토어가 비어있으면 첫 페이지 로드
   useEffect(() => {
     let alive = true;
@@ -61,7 +79,6 @@ const Feed = () => {
         await loadMore();
         if (alive) setInitialLoading(false);
       } else {
-        // 이미 스토어에 데이터가 있으면 다음 page/hasMore 보정
         setPage(Math.floor(posts.length / LIMIT) + 1);
         setHasMore(posts.length < TOTAL_POSTS);
         setInitialLoading(false);
@@ -70,7 +87,7 @@ const Feed = () => {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [loadMore, posts.length]);
 
   // posts 길이가 바뀔 때마다 page/hasMore 동기화 (하이드레이션/추가 로드/새 글 작성 모두 대응)
   useEffect(() => {
@@ -84,26 +101,6 @@ const Feed = () => {
     // 초기 스피너도 보정: 하이드레이션으로 posts가 채워지면 스피너 끔
     if (posts.length > 0) setInitialLoading(false);
   }, [posts.length]);
-
-  const loadMore = async () => {
-    // 이중 가드: ref + state
-    if (isFetchingRef.current || loading || !hasMoreRef.current) return;
-    isFetchingRef.current = true;
-    setLoading(true);
-
-    const { items, total } = await fetchPosts(page, LIMIT);
-    addPosts(items);
-
-    // 서버 total과 page/LIMIT 기준으로 hasMore 판정
-    const endIndex = page * LIMIT; // 이번 요청 후 이론상 끝 인덱스
-    const more = endIndex < total && items.length === LIMIT;
-    setHasMore(more);
-    hasMoreRef.current = more;
-
-    setPage((p) => p + 1);
-    setLoading(false);
-    isFetchingRef.current = false;
-  };
 
   // 무한스크롤
   useEffect(() => {
@@ -121,7 +118,7 @@ const Feed = () => {
 
     io.observe(el);
     return () => io.disconnect();
-  }, [posts.length, hasMore]); // 변화 때마다 재연결
+  }, [posts.length, hasMore, loadMore]);
 
   // 좋아요 업데이트 <낙관적 업데이트 (즉시 UI 반영 후 서버 동기화)>
   const onLike = async (id: number) => {

@@ -16,8 +16,8 @@ const Post = ({
 }: {
   post: PostType;
   type?: "status" | "comment";
-  onLike: (id: number) => void;
-  onRetweet: (id: number) => void;
+  onLike: (_id: number) => void;
+  onRetweet: (_id: number) => void;
   imagePriority?: boolean;
 }) => {
   const nowMs = useNow(20_000); // 20초마다 리렌더되어 "~분 전"이 자동으로 업데이트
@@ -50,19 +50,21 @@ const Post = ({
             type === "status" && "hidden"
           } relative w-10 h-10 rounded-full overflow-hidden`}
         >
-          <NextImage
-            src={post.author.profileImage}
-            alt="프로필 이미지"
-            width={100}
-            height={100}
-          />
+          <Link href={`/${post.author.id}`}>
+            <NextImage
+              src={post.author.profileImage}
+              alt="프로필 이미지"
+              width={100}
+              height={100}
+            />
+          </Link>
         </div>
 
         {/* CONTENT */}
         <div className="flex-1 flex flex-col gap-2">
           {/* TOP */}
           <div className="w-full flex justify-between">
-            <Link href={`/${post.author.username}`} className="flex gap-4">
+            <Link href={`/${post.author.id}`} className="flex gap-4">
               <div
                 className={`${
                   type !== "status" && "hidden"
