@@ -28,7 +28,7 @@ const PopularTags = () => {
         <div className="flex items-center justify-between">
           <span className="text-textGray text-sm">Trending in South Korea</span>
           <NextImage
-            src="icons/infoMore.svg"
+            src="/icons/infoMore.svg"
             alt="info"
             width={16}
             height={16}
@@ -42,7 +42,7 @@ const PopularTags = () => {
         <div className="flex items-center justify-between">
           <span className="text-textGray text-sm">Trending in South Korea</span>
           <NextImage
-            src="icons/infoMore.svg"
+            src="/icons/infoMore.svg"
             alt="info"
             width={16}
             height={16}
@@ -56,7 +56,7 @@ const PopularTags = () => {
         <div className="flex items-center justify-between">
           <span className="text-textGray text-sm">Trending in South Korea</span>
           <NextImage
-            src="icons/infoMore.svg"
+            src="/icons/infoMore.svg"
             alt="info"
             width={16}
             height={16}

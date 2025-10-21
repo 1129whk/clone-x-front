@@ -2,11 +2,11 @@
 
 import React, { useRef, useState } from "react";
 import NextImage from "next/image";
-// import { shareAction } from "@/actions";
 import ImageEditor from "./ImageEditor";
 import { currentUser } from "@/data/currentUser";
 import { usePosts } from "@/store/usePosts";
 import type { Post } from "@/types";
+import Link from "next/link";
 
 const Share = () => {
   const { addPosts } = usePosts();
@@ -108,12 +108,14 @@ const Share = () => {
     <form className="p-4 flex gap-4" onSubmit={handleSubmit}>
       {/* Avatar */}
       <div className="relative w-10 h-10 rounded-full overflow-hidden">
-        <NextImage
-          src={currentUser.profileImage}
-          alt={currentUser.username}
-          width={100}
-          height={100}
-        />
+        <Link href={`/${currentUser.id}`}>
+          <NextImage
+            src={currentUser.profileImage}
+            alt={currentUser.username}
+            width={100}
+            height={100}
+          />
+        </Link>
       </div>
       {/* Others */}
       <div className="flex-1 flex flex-col gap-4">

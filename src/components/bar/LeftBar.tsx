@@ -61,7 +61,7 @@ const LeftBar = () => {
       <div className="flex flex-col gap-4 text-lg items-center xxl:items-start">
         {/* Logo */}
         <Link href="/" className="p-2 rounded-full hover:bg-[#181818] ">
-          <NextImage src="icons/logo.svg" alt="logo" width={24} height={24} />
+          <NextImage src="/icons/logo.svg" alt="logo" width={24} height={24} />
         </Link>
         {/* Menu List */}
         <div className="flex flex-col gap-4">
@@ -72,7 +72,7 @@ const LeftBar = () => {
               key={item.id}
             >
               <NextImage
-                src={`icons/${item.icon}`}
+                src={`/icons/${item.icon}`}
                 alt={item.name}
                 width={24}
                 height={24}
