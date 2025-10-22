@@ -6,7 +6,7 @@ import { persist } from "zustand/middleware";
 import type { Post } from "@/types";
 
 type Mutation = Partial<
-  Pick<Post, "likes" | "isLiked" | "retweets" | "isRetweeted">
+  Pick<Post, "likes" | "isLiked" | "retweets" | "isRetweeted" | "isBookmarked">
 >;
 
 interface PostsState {
@@ -18,6 +18,7 @@ interface PostsState {
   addPost: (post: Post) => void;
   toggleLike: (id: number) => void;
   toggleRetweet: (id: number) => void;
+  toggleBookmark: (id: number) => void;
   clearAll: () => void; // 전체 초기화
 }
 
@@ -44,6 +45,7 @@ export const usePosts = create<PostsState>()(
             isLiked: mu.isLiked ?? p.isLiked,
             retweets: mu.retweets ?? p.retweets,
             isRetweeted: mu.isRetweeted ?? p.isRetweeted,
+            isBookmarked: mu.isBookmarked ?? p.isBookmarked,
           };
         });
 
@@ -132,11 +134,30 @@ export const usePosts = create<PostsState>()(
         set({ posts: nextPosts, mutations: nextMutations });
       },
 
+      toggleBookmark: (id) => {
+        const { posts, mutations } = get();
+        const target = posts.find((p) => p.postId === id);
+        if (!target) return;
+
+        const next = !target.isBookmarked;
+        const nextPosts = posts.map((p) =>
+          p.postId === id ? { ...p, isBookmarked: next } : p
+        );
+
+        const prevMu = mutations[id] ?? {};
+        const nextMutations: Record<number, Mutation> = {
+          ...mutations,
+          [id]: { ...prevMu, isBookmarked: next },
+        };
+
+        set({ posts: nextPosts, mutations: nextMutations });
+      },
+
       clearAll: () => set({ posts: [], mutations: {} }),
     }),
     {
-      name: "posts-v2", // 기존 키 유지(데이터 보존). 버전만 올려서 마이그레이션
-      version: 3,
+      name: "posts-v3", // 기존 키 유지(데이터 보존). 버전만 올려서 마이그레이션
+      version: 4,
       migrate: (state: any, version) => {
         // v2 -> v3 로 올라오면서 mutations 필드가 없으면 추가
         if (!state) return state;

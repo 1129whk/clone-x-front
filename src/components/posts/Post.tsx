@@ -12,16 +12,20 @@ const Post = ({
   type,
   onLike,
   onRetweet,
+  onBookmark,
   imagePriority = false,
 }: {
   post: PostType;
   type?: "status" | "comment";
   onLike: (_id: number) => void;
   onRetweet: (_id: number) => void;
+  onBookmark?: (_id: number) => void;
   imagePriority?: boolean;
 }) => {
   const nowMs = useNow(20_000); // 20초마다 리렌더되어 "~분 전"이 자동으로 업데이트
   if (!post) return null;
+
+  const isBookmarked = (post as any).isBookmarked ?? false;
 
   return (
     <div className="p-4 border-y-[1px] border-borderGray">
@@ -130,8 +134,10 @@ const Post = ({
             retweets={post.retweets}
             isLiked={post.isLiked}
             isRetweeted={post.isRetweeted}
+            isBookmarked={post.isBookmarked ?? false}
             onLike={() => onLike(post.postId)}
             onRetweet={() => onRetweet(post.postId)}
+            onBookmark={onBookmark ? () => onBookmark(post.postId) : undefined}
             statics={post.statics ?? 0}
           />
         </div>

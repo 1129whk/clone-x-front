@@ -12,17 +12,20 @@ import {
   TOTAL_POSTS,
   toggleLike as apiLike,
   toggleRetweet as apiRT,
+  toggleBookmark as apiBM,
 } from "@/lib/mockApi";
 
 import Post from "@/components/posts/Post";
 import Spinner from "@/components/ui/Spinner";
 import Center from "@/components/ui/Center";
+import { claimScope, releaseScope, saveScopedPosts } from "@/lib/scopedStorage";
+import type { Post as PostType } from "@/types";
 
 type TabKey = "posts" | "likes";
 
 const LIMIT = 15;
-const ROOT_MARGIN = "500px 0px 0px 0px"; // 센티넬 여유
-const TICK_MS = 15000; // 상대시간 갱신
+const ROOT_MARGIN = "0px 0px 0px 0px"; // 초기 자동 트리거 방지
+const TICK_MS = 15000;
 
 export default function ProfileClient({
   id,
@@ -39,15 +42,21 @@ export default function ProfileClient({
     addPosts,
     toggleLike: likeInStore,
     toggleRetweet: rtInStore,
+    toggleBookmark: bmInStore,
+    hydrated, // 로컬스토리지 복원 여부
   } = usePosts();
 
   // 전역 페이징 로더
-  const [page, setPage] = useState(() => Math.floor(posts.length / LIMIT) + 1);
-  const [hasMoreGlobal, setHasMoreGlobal] = useState(
+  const [page, setPage] = useState<number>(
+    () => Math.floor(posts.length / LIMIT) + 1
+  );
+  const [hasMoreGlobal, setHasMoreGlobal] = useState<boolean>(
     posts.length < TOTAL_POSTS
   );
-  const [initialLoading, setInitialLoading] = useState(posts.length === 0);
-  const [loadingGlobal, setLoadingGlobal] = useState(false);
+  const [initialLoading, setInitialLoading] = useState<boolean>(
+    posts.length === 0
+  );
+  const [loadingGlobal, setLoadingGlobal] = useState<boolean>(false);
 
   const isFetchingRef = useRef(false);
   const hasMoreRef = useRef(hasMoreGlobal);
@@ -92,7 +101,7 @@ export default function ProfileClient({
     };
   }, [loadMoreGlobal, posts.length]);
 
-  // posts 길이 바뀔 때마다 page/hasMore 동기화
+  // posts 길이가 바뀔 때마다 page/hasMore 동기화
   useEffect(() => {
     const nextPage = Math.floor(posts.length / LIMIT) + 1;
     setPage(nextPage);
@@ -104,7 +113,7 @@ export default function ProfileClient({
     if (posts.length > 0) setInitialLoading(false);
   }, [posts.length]);
 
-  // 상대시간 자동 갱신(Feed와 동일)
+  // 상대시간 자동 갱신
   const [, forceTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => forceTick((v) => v + 1), TICK_MS);
@@ -118,6 +127,12 @@ export default function ProfileClient({
     }
   }, [initialTab, isMe]);
 
+  // 정렬 함수 (타입 명시)
+  const sortDesc = useCallback((a: PostType, b: PostType) => {
+    const t = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    return t !== 0 ? t : b.postId - a.postId;
+  }, []);
+
   // 대상 사용자(author)
   const viewedAuthor = useMemo(() => {
     if (isMe) {
@@ -130,7 +145,7 @@ export default function ProfileClient({
         coverImage: currentUser.coverImage,
       };
     }
-    const found = posts.find((p) => p.author.id === id)?.author;
+    const found = posts.find((p: PostType) => p.author.id === id)?.author;
     return found
       ? {
           ...found,
@@ -143,7 +158,7 @@ export default function ProfileClient({
       : null;
   }, [id, isMe, posts]);
 
-  // 하이드레이션 이후에야 404
+  // 하이드레이션 이후에야 404 판정
   useEffect(() => {
     if (!initialLoading && posts.length > 0 && !viewedAuthor) notFound();
   }, [initialLoading, posts.length, viewedAuthor]);
@@ -151,35 +166,43 @@ export default function ProfileClient({
   // 활성 탭
   const active: TabKey = initialTab;
 
-  // 탭별 소스(전역 posts 전체에서 필터)
-  const source = useMemo(() => {
+  // 탭별 소스
+  const source: PostType[] = useMemo(() => {
     if (!viewedAuthor) return [];
-
-    const sortDesc = (a: any, b: any) => {
-      const t =
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      return t !== 0 ? t : b.postId - a.postId;
-    };
 
     if (active === "posts") {
       const base = isMe
-        ? posts.filter((p) => p.author.id === id || p.isRetweeted === true)
-        : posts.filter((p) => p.author.id === id);
+        ? posts.filter(
+            (p: PostType) => p.author.id === id || p.isRetweeted === true
+          )
+        : posts.filter((p: PostType) => p.author.id === id);
       return base.sort(sortDesc);
     }
 
     if (!isMe) return [];
-    return posts.filter((p) => p.isLiked === true).sort(sortDesc);
-  }, [active, isMe, posts, viewedAuthor, id]);
+    return posts.filter((p: PostType) => p.isLiked === true).sort(sortDesc);
+  }, [active, isMe, posts, viewedAuthor, id, sortDesc]);
 
-  // 로컬(화면) 무한 스크롤: 15개씩 노출
-  const [visibleCount, setVisibleCount] = useState(LIMIT);
+  // 로컬(화면) 페이지 창 관리 — 화면은 무조건 15개부터
+  const [visibleCount, setVisibleCount] = useState<number>(LIMIT);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // 사용자가 실제 스크롤을 했는지 플래그
+  const userHasScrolledRef = useRef(false);
+  useEffect(() => {
+    const onScroll = () => {
+      userHasScrolledRef.current = true;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // 탭/유저 바뀌면 첫 15개부터 & 최상단으로
   useEffect(() => {
     setVisibleCount(LIMIT);
     window.scrollTo({ top: 0, behavior: "auto" });
+    // 새 탭/유저에 들어왔을 때는 다시 “스크롤 전” 상태로 시작
+    userHasScrolledRef.current = false;
   }, [id, active]);
 
   // source 줄면 보이는 개수 줄이기
@@ -190,7 +213,30 @@ export default function ProfileClient({
   const hasMoreLocal = visibleCount < source.length;
   const pageItems = source.slice(0, visibleCount);
 
-  // 센티넬: 로컬 표시 늘리고, 전역도 부족하면 더 불러온다
+  // 프로필 탭별 scope 관리
+  const scopeId = `profile:${id}:${active}`;
+  const prevScopeRef = useRef<string | null>(null);
+  useEffect(() => {
+    // 이전 scope 반납
+    if (prevScopeRef.current && prevScopeRef.current !== scopeId) {
+      releaseScope(prevScopeRef.current);
+    }
+    // 현재 scope 점유
+    claimScope(scopeId);
+    prevScopeRef.current = scopeId;
+
+    // 언마운트 시 현재 scope 반납
+    return () => {
+      releaseScope(scopeId);
+    };
+  }, [scopeId]);
+
+  // 현재 탭에서 보이는 목록을 scope 저장
+  useEffect(() => {
+    saveScopedPosts(scopeId, pageItems);
+  }, [scopeId, pageItems]);
+
+  // 센티넬: 스크롤이 발생한 이후에만 동작
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -198,6 +244,9 @@ export default function ProfileClient({
     const onHit: IntersectionObserverCallback = async (entries) => {
       const entry = entries[0];
       if (!entry?.isIntersecting) return;
+
+      // 사용자가 스크롤하기 전엔 자동 페이지 확장 금지
+      if (!userHasScrolledRef.current) return;
 
       // 화면에 더 보여줄 게 있으면 먼저 늘림
       if (hasMoreLocal) {
@@ -219,48 +268,39 @@ export default function ProfileClient({
     return () => io.disconnect();
   }, [hasMoreLocal, source.length, loadMoreGlobal]);
 
-  // 초기 뷰포트가 넉넉하면 자동으로 한두 번 더 불러오기
-  useEffect(() => {
-    const raf = requestAnimationFrame(async () => {
-      const el = sentinelRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-
-      if (rect.top <= vh + 8) {
-        // 화면 먼저 늘림
-        if (hasMoreLocal) {
-          setVisibleCount((c) => Math.min(c + LIMIT, source.length));
-        } else if (hasMoreRef.current) {
-          // 화면에 더 없으면 전역 로딩
-          await loadMoreGlobal();
-        }
-      }
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [hasMoreLocal, source.length, loadMoreGlobal]);
-
-  // 좋아요/리트윗(낙관적 업데이트)
+  // 좋아요(낙관적 업데이트)
   const onLike = useCallback(
     async (postId: number) => {
       likeInStore(postId);
       const res = await apiLike(postId);
-      if (!res.success) likeInStore(postId); // 롤백
+      if (!res.success) likeInStore(postId);
     },
     [likeInStore]
   );
 
+  // 리트윗(낙관적 업데이트)
   const onRetweet = useCallback(
     async (postId: number) => {
       rtInStore(postId);
       const res = await apiRT(postId);
-      if (!res.success) rtInStore(postId); // 롤백
+      if (!res.success) rtInStore(postId);
     },
     [rtInStore]
   );
 
-  // 초기 스피너(Feed와 동일 조건)
-  if (initialLoading && posts.length === 0) {
+  // 북마크(낙관적 업데이트)
+  const onBookmark = useCallback(
+    async (postId: number) => {
+      bmInStore(postId);
+      const res = await apiBM(postId);
+      if (!res.success) bmInStore(postId); // 실패 시 롤백
+    },
+    [bmInStore]
+  );
+
+  // 렌더링 분기(모든 Hook 호출 이후)
+  if (!hydrated) {
+    // 로컬스토리지 복원이 완료되기 전에는 공통 로더만 노출
     return (
       <Center className="p-6">
         <Spinner size={32} thickness={4} />
@@ -276,7 +316,7 @@ export default function ProfileClient({
       ] as const)
     : ([{ key: "posts", label: "Posts", href: `/${id}` }] as const);
 
-  // 헤더(디자인 그대로)
+  // 헤더
   const Header = viewedAuthor ? (
     <div className="mb-2">
       <div className="relative w-full">
@@ -353,9 +393,11 @@ export default function ProfileClient({
     </div>
   ) : null;
 
+  const hasMoreLocalRender = visibleCount < source.length;
+  const pageItemsRender = source.slice(0, visibleCount);
+
   return (
     <div>
-      {/* 헤더 */}
       {Header}
 
       {/* 탭 바 */}
@@ -395,8 +437,8 @@ export default function ProfileClient({
 
       {/* 패널 */}
       <div id={`panel-${active}`} role="tabpanel" aria-labelledby={active}>
-        {/* 비어있음 처리 */}
-        {!initialLoading && viewedAuthor && source.length === 0 ? (
+        {/* 빈 상태는 '완전히 로딩 끝났고, 화면에 뿌릴 게 진짜 0' 일 때만 */}
+        {!initialLoading && !loadingGlobal && pageItems.length === 0 ? (
           <div className="p-6 text-textGray">
             {active === "likes"
               ? "아직 좋아요한 게시물이 없습니다."
@@ -404,18 +446,16 @@ export default function ProfileClient({
           </div>
         ) : (
           <>
-            {pageItems.map((p, idx) => {
-              const isInitialAboveTheFold = idx < 2;
-              return (
-                <Post
-                  key={p.postId}
-                  post={p}
-                  onLike={() => onLike(p.postId)}
-                  onRetweet={() => onRetweet(p.postId)}
-                  imagePriority={isInitialAboveTheFold}
-                />
-              );
-            })}
+            {pageItems.map((p, idx) => (
+              <Post
+                key={p.postId}
+                post={p}
+                onLike={() => onLike(p.postId)}
+                onRetweet={() => onRetweet(p.postId)}
+                onBookmark={() => onBookmark(p.postId)}
+                imagePriority={idx < 2}
+              />
+            ))}
 
             {/* 센티넬 / 스피너 / 끝 문구 */}
             {hasMoreLocal || hasMoreGlobal ? (
@@ -428,8 +468,7 @@ export default function ProfileClient({
                 )}
               </>
             ) : (
-              // 전역/로컬 모두 더 이상 없음
-              source.length > 0 && (
+              pageItems.length > 0 && (
                 <div className="p-4 text-iconBlue text-center">
                   모든 게시물을 불러왔습니다.
                 </div>

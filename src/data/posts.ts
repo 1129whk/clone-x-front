@@ -53,6 +53,7 @@ const seeds: Post[] = [
     isLiked: false,
     isRetweeted: false,
     statics: 157,
+    isBookmarked: true,
   },
   {
     postId: 2,
@@ -73,6 +74,7 @@ const seeds: Post[] = [
     isLiked: true,
     isRetweeted: false,
     statics: 203,
+    isBookmarked: false,
   },
 ];
 
@@ -125,6 +127,18 @@ const randomUsername = () => {
   return name;
 };
 
+// 3~50에서 "랜덤 16개"를 북마크 ON으로 선정
+const pickRandomBookmarked = () => {
+  const pool: number[] = [];
+  for (let i = 3; i <= 50; i++) pool.push(i);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return new Set(pool.slice(0, 16)); // 16개 선택
+};
+const bookmarkedSet = pickRandomBookmarked();
+
 // 더미 게시물 생성(50개)
 export const mockPosts: Post[] = (() => {
   const list: Post[] = [];
@@ -172,6 +186,7 @@ export const mockPosts: Post[] = (() => {
       isLiked: Math.random() > 0.5,
       isRetweeted: Math.random() > 0.3,
       statics: Math.floor(200 + Math.random() * 4800),
+      isBookmarked: bookmarkedSet.has(i),
     });
   }
 

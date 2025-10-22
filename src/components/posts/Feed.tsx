@@ -7,10 +7,12 @@ import {
   toggleLike,
   toggleRetweet,
   TOTAL_POSTS,
+  toggleBookmark,
 } from "@/lib/mockApi";
 import { usePosts } from "@/store/usePosts";
 import Spinner from "@/components/ui/Spinner";
 import Center from "@/components/ui/Center";
+import { claimScope, releaseScope, saveScopedPosts } from "@/lib/scopedStorage";
 
 // 1번에 15개 게시물을 표시
 const LIMIT = 15;
@@ -22,6 +24,7 @@ const Feed = () => {
     addPosts,
     toggleLike: likeInStore,
     toggleRetweet: rtInStore,
+    toggleBookmark: bmInStore,
   } = usePosts();
 
   // 이미 스토어에 남아 있는 개수에 따라 다음 페이지를 계산
@@ -44,6 +47,17 @@ const Feed = () => {
     }, TICK_MS);
     return () => clearInterval(t);
   }, []);
+
+  // scope 점유/반납 (피드 전용)
+  useEffect(() => {
+    claimScope("feed");
+    return () => releaseScope("feed");
+  }, []);
+
+  // 현재 화면 posts를 scope 저장(스크롤로 늘어날 때마다 자동 덮어쓰기)
+  useEffect(() => {
+    saveScopedPosts("feed", posts);
+  }, [posts]);
 
   // ref 락(스테일 클로저 방지)
   const isFetchingRef = useRef(false);
@@ -137,6 +151,13 @@ const Feed = () => {
     if (!res.success) rtInStore(id); //롤백
   };
 
+  // 북마크
+  const onBookmark = async (id: number) => {
+    bmInStore(id); // 낙관적 업데이트
+    const res = await toggleBookmark(id);
+    if (!res.success) bmInStore(id); // 실패 시 롤백
+  };
+
   // 초기 스피너
   if (initialLoading && posts.length === 0) {
     return (
@@ -157,6 +178,7 @@ const Feed = () => {
             post={p}
             onLike={onLike}
             onRetweet={onRetweet}
+            onBookmark={onBookmark}
             imagePriority={isInitialAboveTheFold}
           />
         );

@@ -30,7 +30,7 @@ const menuList = [
   {
     id: 5,
     name: "Bookmarks",
-    link: "/",
+    link: "/bookmarks",
     icon: "bookmark.svg",
   },
   {

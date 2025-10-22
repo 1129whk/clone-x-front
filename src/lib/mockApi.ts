@@ -72,3 +72,9 @@ export const toggleRetweet = async (postId: number) => {
   // 로컬 상태 업데이트
   return { success: true };
 };
+
+// 북마크 모의 API
+export const toggleBookmark = async (_postId: number) => {
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  return { success: true };
+};

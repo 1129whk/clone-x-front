@@ -28,4 +28,5 @@ export type Post = {
   isLiked: boolean;
   isRetweeted: boolean;
   statics?: number;
+  isBookmarked?: boolean;
 };

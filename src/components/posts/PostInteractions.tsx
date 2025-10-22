@@ -8,8 +8,10 @@ const PostInteractions = ({
   retweets,
   isLiked,
   isRetweeted,
+  isBookmarked,
   onLike,
   onRetweet,
+  onBookmark,
   statics,
 }: {
   comments: number;
@@ -17,8 +19,10 @@ const PostInteractions = ({
   retweets: number;
   isLiked: boolean;
   isRetweeted: boolean;
+  isBookmarked: boolean;
   onLike: () => void;
   onRetweet: () => void;
+  onBookmark?: () => void;
   statics: number;
 }) => {
   return (
@@ -81,21 +85,39 @@ const PostInteractions = ({
         </div>
       </div>
 
-      {/* BookMark & Share (표시만) */}
+      {/* BookMark */}
       <div className="flex items-center gap-2">
-        <div className="cursor-pointer group">
+        <div
+          className={`cursor-pointer group ${
+            onBookmark ? "" : "pointer-events-none"
+          }`}
+          onClick={onBookmark}
+          aria-label={isBookmarked ? "북마크됨" : "북마크"}
+          title={isBookmarked ? "북마크됨" : "북마크"}
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
             height="20"
             viewBox="0 0 24 24"
+            className={
+              isBookmarked
+                ? "text-iconBlue"
+                : "text-textGray group-hover:text-iconBlue"
+            }
+            aria-hidden="true"
           >
             <path
-              className="fill-textGray group-hover:fill-iconBlue"
-              d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5zM6.5 4c-.276 0-.5.22-.5.5v14.56l6-4.29 6 4.29V4.5c0-.28-.224-.5-.5-.5h-11z"
+              d="M6.5 2h11A2.5 2.5 0 0 1 20 4.5v18.44l-8-5.71-8 5.71V4.5A2.5 2.5 0 0 1 6.5 2Z"
+              fill={isBookmarked ? "currentColor" : "none"}
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinejoin="round"
             />
           </svg>
         </div>
+
+        {/* Share (표시만) */}
         <div className="cursor-pointer group">
           <svg
             xmlns="http://www.w3.org/2000/svg"
