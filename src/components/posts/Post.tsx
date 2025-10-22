@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Post as PostType } from "@/types";
 import { useNow, formatRelativeTimeWithNow } from "@/utils/time";
 import PostInteractions from "./PostInteractions";
+import HighlightText from "@/components/common/HighlightText";
 
 const Post = ({
   post,
@@ -105,7 +106,7 @@ const Post = ({
           {/* Text & Media */}
           <Link href={`/${post.author.id}/status/${post.postId}`}>
             <p className={`${type === "status" && "text-lg"}`}>
-              {post.content}
+              <HighlightText text={post.content} linkify={false} />
             </p>
           </Link>
 

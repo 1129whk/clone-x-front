@@ -7,29 +7,31 @@ import { currentUser } from "@/data/currentUser";
 import { usePosts } from "@/store/usePosts";
 import type { Post } from "@/types";
 import Link from "next/link";
+import HighlightText from "@/components/common/HighlightText";
 
 const Share = () => {
   const { addPosts } = usePosts();
-  const [media, setMedia] = useState<File | null>(null);
 
-  // Preview Image Edit
+  // text
+  const [text, setText] = useState("");
+  const maxLength = 280;
+
+  // image
+  const [media, setMedia] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [objectURL, setObjectURL] = useState<string | null>(null);
+
+  // editor
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [settings, setSettings] = useState<{
     type: "original" | "wide" | "square";
-  }>({
-    type: "original",
-  });
-
-  const [text, setText] = useState("");
-  const maxLength = 280;
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const [objectURL, setObjectURL] = useState<string | null>(null);
+  }>({ type: "original" });
 
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 이전 미리보기 URL 해제
+    // revoke old URL
     if (objectURL) URL.revokeObjectURL(objectURL);
 
     const url = URL.createObjectURL(file);
@@ -38,21 +40,16 @@ const Share = () => {
   };
 
   const clearMedia = () => {
-    // 미리보기 URL 해제 + 상태 초기화
     if (objectURL) URL.revokeObjectURL(objectURL);
     setObjectURL(null);
     setMedia(null);
     setIsEditorOpen(false);
     setSettings((s) => ({ ...s, type: "original" }));
-
-    // 같은 파일 다시 선택 가능하도록 input 비우기
     if (fileRef.current) fileRef.current.value = "";
   };
 
   const previewURL = objectURL;
 
-  // 파일을 DataURL로 변환(새로고침 후에도 이미지 유지됨)
-  // 나중에 백엔드 사용시 API로 교체
   const fileToDataUrl = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const fr = new FileReader();
@@ -61,7 +58,7 @@ const Share = () => {
       fr.readAsDataURL(file);
     });
 
-  // 상단 Share도 스토어에 즉시 반영
+  // submit (optimistic to store)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const noText = text.trim().length === 0;
@@ -95,12 +92,10 @@ const Share = () => {
       comments: 0,
       isLiked: false,
       isRetweeted: false,
-      imageFit: settings.type,
+      imageFit: settings.type as any,
     };
 
     addPosts([newPost]);
-
-    // 입력 초기화
     setText("");
     clearMedia();
   };
@@ -118,16 +113,26 @@ const Share = () => {
           />
         </Link>
       </div>
-      {/* Others */}
+
+      {/* Composer */}
       <div className="flex-1 flex flex-col gap-4">
-        <input
-          type="text"
-          name="desc"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="What is happening?!"
-          className="bg-transparent outline-none placeholder:text-textGray text-xl"
-        />
+        <div className="relative">
+          <div className="min-h-[1.75rem] whitespace-pre-wrap break-all [overflow-wrap:anywhere] text-xl text-white pr-2">
+            {text.length === 0 ? (
+              <span className="text-textGray">What is happening?!</span>
+            ) : (
+              <HighlightText text={text} linkify={false} />
+            )}
+          </div>
+          <input
+            type="text"
+            name="desc"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="absolute inset-0 w-full h-full bg-transparent outline-none text-xl text-transparent caret-white"
+          />
+        </div>
+
         {/* preview Image */}
         {media?.type.includes("image") && previewURL && (
           <div className="relative rounded-xl overflow-hidden">
@@ -159,6 +164,7 @@ const Share = () => {
             </div>
           </div>
         )}
+
         {isEditorOpen && previewURL && (
           <ImageEditor
             onClose={() => setIsEditorOpen(false)}
@@ -167,6 +173,8 @@ const Share = () => {
             setSettings={setSettings}
           />
         )}
+
+        {/* footer */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex gap-4 flex-wrap">
             <input
@@ -227,6 +235,7 @@ const Share = () => {
               className="cursor-pointer"
             />
           </div>
+
           <button
             type="submit"
             disabled={

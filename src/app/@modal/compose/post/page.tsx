@@ -2,18 +2,18 @@
 
 import React, { useRef, useState } from "react";
 import NextImage from "next/image";
-// import { shareAction } from "@/actions";
 import ImageEditor from "@/components/posts/ImageEditor";
 import { useRouter } from "next/navigation";
 import { currentUser } from "@/data/currentUser";
 import type { Post } from "@/types";
 import { usePosts } from "@/store/usePosts";
+import HighlightText from "@/components/common/HighlightText";
 
 const PostModal = () => {
   const router = useRouter();
   const { addPost } = usePosts();
 
-  // character limit 280
+  // character limit 280자
   const [text, setText] = useState("");
   const maxLength = 280;
 
@@ -222,7 +222,12 @@ const PostModal = () => {
                     <span className="text-textGray">What is happening?!</span>
                   ) : (
                     <>
-                      {text.slice(0, maxLength)}
+                      {/* 280자까지는 하이라이트 */}
+                      <HighlightText
+                        text={text.slice(0, maxLength)}
+                        linkify={false}
+                      />
+                      {/* 초과분은 붉은 배경 */}
                       {text.length > maxLength && (
                         <span className="bg-red-600/60 rounded-sm">
                           {text.slice(maxLength)}
