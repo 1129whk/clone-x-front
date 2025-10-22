@@ -117,6 +117,15 @@ const Post = ({
               height={600}
               priority={imagePriority || type === "status"} // 상세 페이지거나 첫 카드면 우선 로드
               sizes="(max-width: 640px) 100vw, 600px"
+              className={[
+                "w-full",
+                // 저장된 imageFit 기준으로 동일한 레이아웃 적용
+                post.imageFit === "square"
+                  ? "aspect-square object-cover"
+                  : post.imageFit === "wide"
+                  ? "aspect-video object-cover"
+                  : "h-full object-contain", // original
+              ].join(" ")}
             />
           )}
 

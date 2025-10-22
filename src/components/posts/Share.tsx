@@ -95,6 +95,7 @@ const Share = () => {
       comments: 0,
       isLiked: false,
       isRetweeted: false,
+      imageFit: settings.type,
     };
 
     addPosts([newPost]);

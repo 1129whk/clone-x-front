@@ -16,6 +16,8 @@ export type Author = {
   verified?: boolean;
 };
 
+export type ImageFit = "original" | "wide" | "square";
+
 export type Post = {
   postId: number;
   author: Author;
@@ -29,4 +31,5 @@ export type Post = {
   isRetweeted: boolean;
   statics?: number;
   isBookmarked?: boolean;
+  imageFit?: ImageFit;
 };
