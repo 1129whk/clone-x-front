@@ -156,7 +156,8 @@ const RightBar = () => {
         <div
           ref={railRef}
           tabIndex={0}
-          className="overscroll-contain space-y-4"
+          data-testid="rightbar-rail"
+          className="rightbar-scroll overflow-y-auto overscroll-contain space-y-4 pr-1"
           style={{
             // 스크롤 설정
             overflowY: "auto",
