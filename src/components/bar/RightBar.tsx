@@ -45,7 +45,7 @@ const RightBar = () => {
     };
 
     const syncIncremental = () => {
-      // 증분(ΔY)만큼 내부 스크롤에 누적 반영 -> 위/아래 즉시 동기화
+      // 증분만큼 내부 스크롤에 누적 반영 -> 위/아래 즉시 동기화
       if (!didInitRef.current) {
         absoluteAlign();
         return;

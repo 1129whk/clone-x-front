@@ -1,12 +1,13 @@
 "use client";
 
-import NextImage from "next/image";
-import PostInfo from "./PostInfo";
 import Link from "next/link";
 import type { Post as PostType } from "@/types";
 import { useNow, formatRelativeTimeWithNow } from "@/utils/time";
 import PostInteractions from "./PostInteractions";
+import PostInfo from "./PostInfo";
 import HighlightText from "@/components/common/HighlightText";
+import BlurImage from "@/components/common/BlurImage";
+import NextImage from "next/image";
 
 const Post = ({
   post,
@@ -23,14 +24,14 @@ const Post = ({
   onBookmark?: (_id: number) => void;
   imagePriority?: boolean;
 }) => {
-  const nowMs = useNow(20_000); // 20초마다 리렌더되어 "~분 전"이 자동으로 업데이트
+  const nowMs = useNow(20_000);
   if (!post) return null;
 
   const isBookmarked = (post as any).isBookmarked ?? false;
 
   return (
     <div className="p-4 border-y-[1px] border-borderGray">
-      {/* Retweet */}
+      {/* Retweet 라벨 */}
       {post.isRetweeted && (
         <div className="flex items-center gap-2 text-sm text-textGray mb-2">
           <svg
@@ -61,6 +62,8 @@ const Post = ({
               alt="프로필 이미지"
               width={100}
               height={100}
+              loading="lazy"
+              decoding="async"
             />
           </Link>
         </div>
@@ -80,6 +83,8 @@ const Post = ({
                   alt="프로필 이미지"
                   width={100}
                   height={100}
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
               <div
@@ -111,21 +116,25 @@ const Post = ({
           </Link>
 
           {post.images?.[0] && (
-            <NextImage
+            <BlurImage
               src={post.images[0]}
               alt="post-media"
               width={600}
-              height={600}
-              priority={imagePriority || type === "status"} // 상세 페이지거나 첫 카드면 우선 로드
+              height={post.imageFit === "square" ? 600 : 600}
               sizes="(max-width: 640px) 100vw, 600px"
-              className={[
+              priority={imagePriority || type === "status"}
+              decoding="async"
+              placeholderSize={{
+                w: 600,
+                h: post.imageFit === "square" ? 600 : 400,
+              }}
+              imgClassName={[
                 "w-full",
-                // 저장된 imageFit 기준으로 동일한 레이아웃 적용
                 post.imageFit === "square"
                   ? "aspect-square object-cover"
                   : post.imageFit === "wide"
                   ? "aspect-video object-cover"
-                  : "h-full object-contain", // original
+                  : "h-full object-contain",
               ].join(" ")}
             />
           )}

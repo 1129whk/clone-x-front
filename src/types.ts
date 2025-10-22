@@ -13,6 +13,7 @@ export type Author = {
   name: string;
   username: string;
   profileImage: string;
+  coverImage?: string;
   verified?: boolean;
 };
 

@@ -41,6 +41,7 @@ const seeds: Post[] = [
       name: "김개발",
       username: "kimdev",
       profileImage: "https://picsum.photos/40/40?random=1",
+      coverImage: "https://picsum.photos/1200/400?random=101",
       verified: true,
     },
     content:
@@ -62,6 +63,7 @@ const seeds: Post[] = [
       name: "이디자인",
       username: "leedesign",
       profileImage: "https://picsum.photos/40/40?random=2",
+      coverImage: "https://picsum.photos/1200/400?random=102",
       verified: false,
     },
     content:
@@ -170,6 +172,7 @@ export const mockPosts: Post[] = (() => {
         name,
         username,
         profileImage: `https://picsum.photos/40/40?random=${profileRandom}`,
+        coverImage: `https://picsum.photos/1200/400?random=${100 + i}`,
         verified: Math.random() > 0.8, // 20% 확률로 인증 마크
       },
       content: `${name}님이 개발 관련 포스트를 올렸습니다! ${
