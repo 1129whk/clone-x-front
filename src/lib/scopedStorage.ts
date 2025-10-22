@@ -1,5 +1,3 @@
-// 화면(또는 탭)마다 posts-v2를 "임대"해서 쓰고, 떠날 때 지운다
-
 import type { Post } from "@/types";
 
 const KEY_DATA = "scoped-posts-v1"; // 스코프용 별도 키

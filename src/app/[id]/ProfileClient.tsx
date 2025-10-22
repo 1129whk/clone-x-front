@@ -18,7 +18,12 @@ import {
 import Post from "@/components/posts/Post";
 import Spinner from "@/components/ui/Spinner";
 import Center from "@/components/ui/Center";
-import { claimScope, releaseScope, saveScopedPosts } from "@/lib/scopedStorage";
+import {
+  claimScope,
+  releaseScope,
+  saveScopedPosts,
+  readScopedPosts,
+} from "@/lib/scopedStorage";
 import type { Post as PostType } from "@/types";
 import BlurImage from "@/components/common/BlurImage";
 
@@ -52,6 +57,9 @@ export default function ProfileClient({
     toggleBookmark: bmInStore,
     hydrated,
   } = usePosts();
+
+  // 현재 탭/유저 scope 스냅샷(로컬스토리지)을 즉시 사용할 로컬 상태
+  const [snapshot, setSnapshot] = useState<PostType[] | null>(null);
 
   // 전역 페이징 로더
   const [page, setPage] = useState<number>(
@@ -140,8 +148,9 @@ export default function ProfileClient({
     return t !== 0 ? t : b.postId - a.postId;
   }, []);
 
-  // 대상 사용자(author)
+  // 대상 사용자(author) — snapshot도 함께 탐색
   const viewedAuthor = useMemo(() => {
+    // 내 프로필
     if (isMe) {
       return {
         id: currentUser.id,
@@ -153,8 +162,32 @@ export default function ProfileClient({
       };
     }
 
+    // snapshot에서 먼저 찾아봄
+    const foundSnap = snapshot?.find((p) => p.author.id === id)?.author;
+
+    // 전역 posts에서 찾기
+    const foundStore = posts.find((p) => p.author.id === id)?.author;
+
+    const base = foundSnap ?? foundStore;
+
+    if (base) {
+      const seed = 100 + (hashToNum(base.id) % 900);
+      return {
+        id: base.id,
+        name: base.name ?? base.username ?? base.id,
+        username: base.username ?? base.id,
+        profileImage:
+          base.profileImage ?? `https://picsum.photos/80/80?random=${seed}`,
+        verified: !!base.verified,
+        coverImage:
+          (base as any).coverImage ??
+          `https://picsum.photos/1200/400?random=${seed}`,
+      };
+    }
+
+    // 아무것도 없으면 fallback
     const seed = 100 + (hashToNum(id) % 900);
-    const fallback = {
+    return {
       id,
       name: id,
       username: id,
@@ -162,30 +195,12 @@ export default function ProfileClient({
       verified: false,
       coverImage: `https://picsum.photos/1200/400?random=${seed}`,
     };
-
-    const found = posts.find((p) => p.author.id === id)?.author;
-    if (found) {
-      return {
-        id: found.id,
-        name: found.name ?? found.username ?? found.id,
-        username: found.username ?? found.id,
-        profileImage: found.profileImage ?? fallback.profileImage,
-        verified: !!found.verified,
-        coverImage: (found as any).coverImage ?? fallback.coverImage,
-      };
-    }
-    return fallback;
-  }, [id, isMe, posts]);
-
-  // 하이드레이션 이후에야 404 판정
-  useEffect(() => {
-    if (!initialLoading && posts.length > 0 && !viewedAuthor) notFound();
-  }, [initialLoading, posts.length, viewedAuthor]);
+  }, [id, isMe, posts, snapshot]);
 
   // 활성 탭
   const active: TabKey = initialTab;
 
-  // 탭별 소스
+  // 탭별 소스(전역 스토어 기준)
   const source: PostType[] = useMemo(() => {
     if (!viewedAuthor) return [];
     if (active === "posts") {
@@ -214,6 +229,33 @@ export default function ProfileClient({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // scope 관리 + 스냅샷 선반영
+  const scopeId = `profile:${id}:${active}`;
+  const prevScopeRef = useRef<string | null>(null);
+  useEffect(() => {
+    // 이전 scope 반납
+    if (prevScopeRef.current && prevScopeRef.current !== scopeId) {
+      releaseScope(prevScopeRef.current);
+    }
+    // 현재 scope 점유
+    claimScope(scopeId);
+    prevScopeRef.current = scopeId;
+
+    // 로컬스토리지 스냅샷 즉시 로드
+    const snap = readScopedPosts(scopeId);
+    setSnapshot(snap ?? null);
+    if (snap?.length) {
+      setVisibleCount((c) => Math.max(LIMIT, Math.min(c, snap.length)));
+      // 초기 로딩 문구가 나오지 않도록 보정
+      setInitialLoading(false);
+    }
+
+    // 언마운트 시 현재 scope 반납
+    return () => {
+      releaseScope(scopeId);
+    };
+  }, [scopeId]);
+
   // 탭/유저 변경 시 초기화
   useEffect(() => {
     setVisibleCount(LIMIT);
@@ -221,29 +263,16 @@ export default function ProfileClient({
     userHasScrolledRef.current = false;
   }, [id, active]);
 
-  // source 줄면 보이는 개수 줄이기
+  // 실제 전역 소스 길이 변하면 보이는 개수 보정
   useEffect(() => {
     setVisibleCount((c) => Math.min(c, source.length));
   }, [source.length]);
 
+  // 현재 화면의 전역 소스
   const hasMoreLocal = visibleCount < source.length;
   const pageItems = source.slice(0, visibleCount);
 
-  // scope 관리
-  const scopeId = `profile:${id}:${active}`;
-  const prevScopeRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (prevScopeRef.current && prevScopeRef.current !== scopeId) {
-      releaseScope(prevScopeRef.current);
-    }
-    claimScope(scopeId);
-    prevScopeRef.current = scopeId;
-    return () => {
-      releaseScope(scopeId);
-    };
-  }, [scopeId]);
-
-  // 현재 탭 스냅샷 저장
+  // 현재 탭 스냅샷 저장(전역 소스 기준)
   useEffect(() => {
     saveScopedPosts(scopeId, pageItems);
   }, [scopeId, pageItems]);
@@ -302,14 +331,12 @@ export default function ProfileClient({
     [bmInStore]
   );
 
-  // 렌더링 분기
-  if (!hydrated) {
-    return (
-      <Center className="p-6">
-        <Spinner size={32} thickness={4} />
-      </Center>
-    );
-  }
+  // 스피너/빈 상태 판정: "전역도 비었고 스냅샷도 없을 때"만 스피너/빈문구
+  const isTrulyEmpty =
+    !initialLoading &&
+    !loadingGlobal &&
+    pageItems.length === 0 &&
+    !(snapshot && snapshot.length > 0);
 
   // 탭 링크
   const tabs = isMe
@@ -402,6 +429,19 @@ export default function ProfileClient({
     </div>
   ) : null;
 
+  // 렌더 소스: 전역(pageItems)이 비어있으면 스냅샷로 대체
+  const renderItems =
+    pageItems.length > 0 ? pageItems : snapshot ? snapshot.slice(0, LIMIT) : [];
+
+  // 초기 로딩 스피너도 스냅샷 있으면 건너뜀
+  if (initialLoading && posts.length === 0 && !(snapshot && snapshot.length)) {
+    return (
+      <Center className="p-6">
+        <Spinner size={32} thickness={4} />
+      </Center>
+    );
+  }
+
   return (
     <div>
       {Header}
@@ -443,7 +483,7 @@ export default function ProfileClient({
 
       {/* 패널 */}
       <div id={`panel-${active}`} role="tabpanel" aria-labelledby={active}>
-        {!initialLoading && !loadingGlobal && pageItems.length === 0 ? (
+        {isTrulyEmpty ? (
           <div className="p-6 text-textGray">
             {active === "likes"
               ? "아직 좋아요한 게시물이 없습니다."
@@ -451,7 +491,7 @@ export default function ProfileClient({
           </div>
         ) : (
           <>
-            {pageItems.map((p, idx) => (
+            {renderItems.map((p, idx) => (
               <Post
                 key={p.postId}
                 post={p}
@@ -462,6 +502,7 @@ export default function ProfileClient({
               />
             ))}
 
+            {/* 전역 소스 기준으로만 인피니트 컨트롤 */}
             {visibleCount < source.length || hasMoreGlobal ? (
               <>
                 <div ref={sentinelRef} className="h-8" />
@@ -472,7 +513,7 @@ export default function ProfileClient({
                 )}
               </>
             ) : (
-              pageItems.length > 0 && (
+              renderItems.length > 0 && (
                 <div className="p-4 text-iconBlue text-center">
                   모든 게시물을 불러왔습니다.
                 </div>

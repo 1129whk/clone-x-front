@@ -10,6 +10,7 @@ import PopularTagsSkeleton from "./PopularTagsSkeleton";
 import RecommendationsSkeleton from "./RecommendationsSkeleton";
 
 const HEADER_H = 1; // 상단 고정 헤더 높이(px)
+const SCROLLBAR_GUTTER = 16; // 대부분 브라우저의 스크롤바 너비(대략값)
 
 const clamp = (v: number, min: number, max: number) =>
   Math.min(max, Math.max(min, v));
@@ -35,7 +36,6 @@ const RightBar = () => {
     };
 
     const absoluteAlign = () => {
-      // 초기 1회: 현재 window 위치에 맞춰 내부 스크롤 절대 정렬
       const sY = startY();
       const delta = window.scrollY - sY;
       const maxR = Math.max(0, rail.scrollHeight - rail.clientHeight);
@@ -45,7 +45,6 @@ const RightBar = () => {
     };
 
     const syncIncremental = () => {
-      // 증분만큼 내부 스크롤에 누적 반영 -> 위/아래 즉시 동기화
       if (!didInitRef.current) {
         absoluteAlign();
         return;
@@ -57,9 +56,7 @@ const RightBar = () => {
       if (dY === 0) return;
 
       const maxR = Math.max(0, rail.scrollHeight - rail.clientHeight);
-      const next = clamp(rail.scrollTop + dY, 0, maxR);
-      rail.scrollTop = next;
-
+      rail.scrollTop = clamp(rail.scrollTop + dY, 0, maxR);
       lastWinYRef.current = curr;
     };
 
@@ -69,8 +66,6 @@ const RightBar = () => {
     };
 
     const onResize = () => {
-      // 레이아웃이 변하면 절대 정렬로 다시 맞춘 뒤(1회)
-      // 이후 스크롤은 증분 방식으로 계속 동기화
       didInitRef.current = false;
       absoluteAlign();
     };
@@ -157,12 +152,33 @@ const RightBar = () => {
     <aside className="pt-1">
       {/* sticky 래퍼: 상단 헤더 만큼 여유 */}
       <div ref={outerRef} className="sticky" style={{ top: HEADER_H }}>
-        {/* 내부 스크롤 컨테이너(보이지 않는 별도 스크롤) */}
+        {/* 내부 스크롤 컨테이너(별도 스크롤) */}
         <div
           ref={railRef}
           tabIndex={0}
-          className="rightbar-scroll overflow-y-auto overscroll-contain space-y-4 pr-1"
-          style={{ maxHeight: `calc(100vh - ${HEADER_H}px)` }}
+          className="overscroll-contain space-y-4"
+          style={{
+            // 스크롤 설정
+            overflowY: "auto",
+            maxHeight: `calc(100vh - ${HEADER_H}px)`,
+
+            /**
+             * 스크롤바 절대 미노출 레이아웃 트릭
+             * 오른쪽에 스크롤바가 그려지더라도, 그 영역을 뷰 밖으로 밀어냅니다.
+             * paddingRight 로 내용이 가려지지 않게 여백을 주고
+             * marginRight 를 음수로 주어 스크롤바가 화면 밖(오른쪽)으로 나가도록
+             * 이 방식은 첫 페인트 직전에도 적용되므로 "깜빡" 보일 여지가 없습니다.
+             */
+            paddingRight: `${SCROLLBAR_GUTTER}px`,
+            marginRight: `-${SCROLLBAR_GUTTER}px`,
+
+            /**
+             * 보조 안전망(크로스 브라우저 스크롤바 숨김 속성)
+             * 일부 엔진에서 스크롤바가 강제로 그려지려 해도 최대한 숨깁니다.
+             */
+            msOverflowStyle: "none" as any, // IE/Edge(old)
+            scrollbarWidth: "none" as any, // Firefox
+          }}
         >
           {/* 검색창: 내부 기준 sticky + 배경으로 가림 */}
           <div className="sticky" style={{ top: 8, zIndex: 30 }}>
@@ -184,7 +200,7 @@ const RightBar = () => {
           </Suspense>
 
           {/* footer(끝에서 멈춤) */}
-          <div className="text-textGray text-sm flex gap-x-4 flex-wrap pb-2">
+          <div className="text-textGray text-sm flex gap-x-4 flex-wrap pb-2 pr-1">
             <Link href="/">Terms of Service</Link>
             <Link href="/">Privacy Policy</Link>
             <Link href="/">Cookie Policy</Link>
@@ -194,18 +210,6 @@ const RightBar = () => {
           </div>
         </div>
       </div>
-
-      {/* RightBar 스크롤바 숨김(디자인 유지) */}
-      <style jsx global>{`
-        .rightbar-scroll {
-          scrollbar-width: none; /* Firefox */
-        }
-        .rightbar-scroll::-webkit-scrollbar {
-          display: none; /* Chrome/Safari/Edge */
-          width: 0;
-          height: 0;
-        }
-      `}</style>
     </aside>
   );
 };
